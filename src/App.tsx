@@ -1,65 +1,83 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Pokemon, getAll, getByName } from "./API";
 
+/* APIs (BE simulation) */
+import { Pokemon, getAll, getByName, PokemonWithPower } from "./API";
+
+/*Utils */
+import {
+	calculatePower,
+	CountOverThreshold,
+	MaxPower,
+	MinPower,
+} from "./utils";
+
+import PokemonTable from "./PokemonTable";
+
+/* Styles */
 import "./styles.css";
 
-const calculatePower = (pokemon: Pokemon) =>
-  pokemon.hp +
-  pokemon.attack +
-  pokemon.defense +
-  pokemon.special_attack +
-  pokemon.special_defense +
-  pokemon.speed;
+let appRenders = 0;
+function App() {
+	console.log("App renders ", appRenders++);
+	const [pokemon, setPokemon] = useState<Pokemon[]>([]);
 
-const PokemonTable: React.FunctionComponent<{
-  pokemon: Pokemon[];
-}> = ({ pokemon }) => {
-  return (
-    <table>
-      <thead>
-        <tr>
-          <td>ID</td>
-          <td>Name</td>
-          <td>Type</td>
-          <td colSpan={6}>Stats</td>
-        </tr>
-      </thead>
-      <tbody>
-        {pokemon.map((p) => (
-          <tr key={p.id}>
-            <td>{p.id}</td>
-            <td>{p.name}</td>
-            <td>{p.type.join(",")}</td>
-            <td>{p.hp}</td>
-            <td>{p.attack}</td>
-            <td>{p.defense}</td>
-            <td>{p.special_attack}</td>
-            <td>{p.special_defense}</td>
-            <td>{p.speed}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-};
+	useEffect(() => {
+		getAll().then((data) => setPokemon(data));
+	}, []);
 
-export default function App() {
-  return (
-    <div>
-      <div className="top-bar">
-        <div>Search</div>
-        <input type="text"></input>
-        <div>Power threshold</div>
-        <input type="text"></input>
-        <div>Count over threshold: </div>
-      </div>
-      <div className="two-column">
-        <PokemonTable pokemon={[]} />
-        <div>
-          <div>Min: </div>
-          <div>Max: </div>
-        </div>
-      </div>
-    </div>
-  );
+	/* Set up the pokemon with power */
+	const pokemonWithPower = useMemo(
+		() =>
+			pokemon.map((p) => ({
+				...p,
+				power: calculatePower(p),
+			})),
+		[pokemon]
+	);
+
+	/* Handle threshold */
+	const [threshold, setThreshold] = useState<number>(0);
+	const handleChangeThreshold = (evt: React.ChangeEvent<HTMLInputElement>) =>
+		setThreshold(parseInt(evt.target.value, 10) || 0);
+
+	const countOverThreshold = useMemo(
+		() => CountOverThreshold(pokemonWithPower, threshold),
+		[pokemonWithPower, threshold]
+	);
+
+	/* Handle Min and Max */
+	const min = useMemo(() => MinPower(pokemonWithPower), [pokemonWithPower]);
+	const max = useMemo(() => MaxPower(pokemonWithPower), [pokemonWithPower]);
+
+	/* Handle search */
+	const [searchStr, setSearchStr] = useState<string>("");
+	const handleChangeSearch = (evt: React.ChangeEvent<HTMLInputElement>) =>
+		setSearchStr(evt.target.value);
+
+	useEffect(() => {
+		getByName(searchStr).then((data) => setPokemon(data));
+	}, [searchStr]);
+
+	return (
+		<div>
+			<div className="top-bar">
+				<div>Search</div>
+				<input type="text" value={searchStr} onChange={handleChangeSearch} />
+				<div>Power threshold</div>
+				<input type="text" value={threshold} onChange={handleChangeThreshold} />
+				<div>Count over threshold: {countOverThreshold}</div>
+			</div>
+			<br />
+			<hr />
+			<div className="two-column">
+				<PokemonTable pokemon={pokemonWithPower} />
+				<div>
+					<div>Min: {min}</div>
+					<div>Max: {max}</div>
+				</div>
+			</div>
+		</div>
+	);
 }
+
+export default App;
